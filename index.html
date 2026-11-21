@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Block Puzzle</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(180deg, #129468 0%, #0b6e4d 100%);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      color: #ffffff;
+      overflow: hidden;
+    }
+
+    .game-wrapper {
+      width: 100%;
+      max-width: 440px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(8, 56, 40, 0.45);
+      padding: 10px 16px;
+      border-radius: 14px;
+      backdrop-filter: blur(4px);
+    }
+
+    .score-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .score-label {
+      font-size: 12px;
+      opacity: 0.85;
+      letter-spacing: 0.5px;
+    }
+
+    .score-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #fde047;
+    }
+
+    .best-box {
+      text-align: right;
+    }
+
+    .best-value {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .restart-btn {
+      background: #22c55e;
+      color: #052e16;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .restart-btn:active {
+      transform: scale(0.96);
+    }
+
+    .board-container {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #0b4633;
+      border-radius: 14px;
+      padding: 8px;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.35), 0 8px 20px rgba(0, 0, 0, 0.25);
+      position: relative;
+    }
+
+    .board {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: 4px;
+    }
+
+    .cell {
+      background: #125841;
+      border-radius: 6px;
+      position: relative;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+
+    .cell.filled {
+      box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .cell.ghost {
+      outline: 2px dashed rgba(255, 255, 255, 0.75);
+      filter: brightness(1.25);
+      opacity: 0.75;
+    }
+
+    .dock {
+      width: 100%;
+      height: 118px;
+      background: rgba(8, 56, 40, 0.45);
+      border-radius: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .dock-slot {
+      background: rgba(11, 70, 51, 0.65);
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      cursor: grab;
+    }
+
+    .dock-slot.hidden-piece .piece-preview {
+      opacity: 0;
+    }
+
+    .piece-preview {
+      display: grid;
+      gap: 3px;
+      pointer-events: none;
+    }
+
+    .mini-cell {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+    }
+
+    .mini-cell.empty {
+      background: transparent;
+    }
+
+    .mini-cell.block {
+      box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    #drag-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 999;
+      display: none;
+      transform: translate(-50%, -65%);
+    }
+
+    .drag-grid {
+      display: grid;
+      gap: 4px;
+    }
+
+    .drag-cell {
+      border-radius: 6px;
+    }
+
+    .drag-cell.block {
+      box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: #134e3a;
+      border: 2px solid #34d399;
+      border-radius: 18px;
+      padding: 24px;
+      text-align: center;
+      max-width: 320px;
+      width: 100%;
+    }
+
+    .modal h2 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      color: #fde047;
+    }
+
+    .modal p {
+      margin: 0 0 18px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <div class="header">
+      <div class="score-box">
+        <span class="score-label">SCORE</span>
+        <span class="score-value" id="score">0</span>
+      </div>
+      <div class="best-box">
+        <span class="score-label">BEST</span>
+        <div class="best-value" id="best">0</div>
+      </div>
+      <button class="restart-btn" id="restart-btn">Restart</button>
+    </div>
+
+    <div class="board-container">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="dock" id="dock">
+      <div class="dock-slot" data-slot="0"></div>
+      <div class="dock-slot" data-slot="1"></div>
+      <div class="dock-slot" data-slot="2"></div>
+    </div>
+  </div>
+
+  <div id="drag-layer"></div>
+
+  <div class="overlay" id="gameover-overlay">
+    <div class="modal">
+      <h2>Game Over!</h2>
+      <p>Final Score: <strong id="final-score">0</strong></p>
+      <button class="restart-btn" id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    const GRID_SIZE = 8;
+    const COLORS = [
+      "#6366f1", // Indigo
+      "#a855f7", // Purple
+      "#0ea5e9", // Sky
+      "#22c55e", // Green
+      "#eab308", // Yellow
+      "#ef4444", // Red
+      "#f97316", // Orange
+      "#14b8a6"  // Teal
+    ];
+
+    const SHAPES = [
+      [[1]],
+      [[1, 1]],
+      [[1], [1]],
+      [[1, 1, 1]],
+      [[1], [1], [1]],
+      [[1, 1], [1, 1]],
+      [[1, 0], [1, 0], [1, 1]],
+      [[0, 1], [0, 1], [1, 1]],
+      [[1, 1, 1], [0, 1, 0]],
+      [[1, 1, 1, 1]],
+      [[1], [1], [1], [1]]
+    ];
+
+    let board = [];
+    let dockPieces = [null, null, null];
+    let score = 0;
+    let bestScore = Number(localStorage.getItem("blockPuzzleBest") || 0);
+
+    let dragState = null;
+
+    const boardEl = document.getElementById("board");
+    const dockEl = document.getElementById("dock");
+    const dragLayerEl = document.getElementById("drag-layer");
+    const scoreEl = document.getElementById("score");
+    const bestEl = document.getElementById("best");
+    const finalScoreEl = document.getElementById("final-score");
+    const overlayEl = document.getElementById("gameover-overlay");
+
+    function createEmptyBoard() {
+      return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+    }
+
+    function randomPiece() {
+      const matrix = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+      const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      return { matrix, color };
+    }
+
+    function refillDockIfEmpty() {
+      if (dockPieces.every(p => p === null)) {
+        dockPieces = [randomPiece(), randomPiece(), randomPiece()];
+      }
+    }
+
+    function initGame() {
+      board = createEmptyBoard();
+      dockPieces = [randomPiece(), randomPiece(), randomPiece()];
+      score = 0;
+      dragState = null;
+      overlayEl.classList.remove("show");
+      updateScore(0);
+      renderBoard();
+      renderDock();
+    }
+
+    function updateScore(newScore) {
+      score = newScore;
+      scoreEl.textContent = score;
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem("blockPuzzleBest", bestScore);
+      }
+      bestEl.textContent = bestScore;
+    }
+
+    function renderBoard(ghostCells = []) {
+      const ghostSet = new Set(ghostCells.map(([r, c]) => `${r},${c}`));
+      boardEl.innerHTML = "";
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          const color = board[r][c];
+          if (color) {
+            cell.classList.add("filled");
+            cell.style.backgroundColor = color;
+          } else if (ghostSet.has(`${r},${c}`)) {
+            cell.classList.add("ghost");
+            cell.style.backgroundColor = dragState ? dragState.piece.color : "#ffffff";
+          }
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function renderDock() {
+      const slots = dockEl.querySelectorAll(".dock-slot");
+      slots.forEach((slot, idx) => {
+        slot.innerHTML = "";
+        slot.classList.remove("hidden-piece");
+        const piece = dockPieces[idx];
+        if (!piece) return;
+
+        const rows = piece.matrix.length;
+        const cols = piece.matrix[0].length;
+        const preview = document.createElement("div");
+        preview.className = "piece-preview";
+        preview.style.gridTemplateColumns = `repeat(${cols}, 18px)`;
+        preview.style.gridTemplateRows = `repeat(${rows}, 18px)`;
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const mCell = document.createElement("div");
+            mCell.className = "mini-cell";
+            if (piece.matrix[r][c]) {
+              mCell.classList.add("block");
+              mCell.style.backgroundColor = piece.color;
+            } else {
+              mCell.classList.add("empty");
+            }
+            preview.appendChild(mCell);
+          }
+        }
+        slot.appendChild(preview);
+      });
+    }
+
+    function canPlace(matrix, startRow, startCol) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (matrix[r][c]) {
+            const br = startRow + r;
+            const bc = startCol + c;
+            if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) {
+              return false;
+            }
+            if (board[br][bc] !== null) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    function placePiece(piece, startRow, startCol) {
+      const rows = piece.matrix.length;
+      const cols = piece.matrix[0].length;
+      let blockCount = 0;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (piece.matrix[r][c]) {
+            board[startRow + r][startCol + c] = piece.color;
+            blockCount++;
+          }
+        }
+      }
+
+      const clearedLines = clearFullLines();
+      const lineBonus = clearedLines > 0 ? clearedLines * 100 * clearedLines : 0;
+      updateScore(score + blockCount * 10 + lineBonus);
+    }
+
+    function clearFullLines() {
+      const fullRows = [];
+      const fullCols = [];
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        if (board[r].every(cell => cell !== null)) {
+          fullRows.push(r);
+        }
+      }
+
+      for (let c = 0; c < GRID_SIZE; c++) {
+        let colFull = true;
+        for (let r = 0; r < GRID_SIZE; r++) {
+          if (board[r][c] === null) {
+            colFull = false;
+            break;
+          }
+        }
+        if (colFull) fullCols.push(c);
+      }
+
+      fullRows.forEach(r => {
+        for (let c = 0; c < GRID_SIZE; c++) board[r][c] = null;
+      });
+
+      fullCols.forEach(c => {
+        for (let r = 0; r < GRID_SIZE; r++) board[r][c] = null;
+      });
+
+      return fullRows.length + fullCols.length;
+    }
+
+    function hasAnyValidMove() {
+      for (const piece of dockPieces) {
+        if (!piece) continue;
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            if (canPlace(piece.matrix, r, c)) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function getBoardDropPosition(clientX, clientY, matrix) {
+      const rect = boardEl.getBoundingClientRect();
+      const cellSize = rect.width / GRID_SIZE;
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+
+      // Offset slightly upward so finger/cursor doesn't hide the piece
+      const adjustedY = clientY - cellSize * 0.7;
+      const topLeftX = clientX - (cols * cellSize) / 2;
+      const topLeftY = adjustedY - (rows * cellSize) / 2;
+
+      const startCol = Math.round((topLeftX - rect.left) / cellSize);
+      const startRow = Math.round((topLeftY - rect.top) / cellSize);
+      return { startRow, startCol };
+    }
+
+    function buildDragElement(piece) {
+      const boardRect = boardEl.getBoundingClientRect();
+      const cellSize = Math.floor(boardRect.width / GRID_SIZE) - 2;
+      const rows = piece.matrix.length;
+      const cols = piece.matrix[0].length;
+
+      dragLayerEl.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "drag-grid";
+      grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+      grid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dCell = document.createElement("div");
+          dCell.className = "drag-cell";
+          if (piece.matrix[r][c]) {
+            dCell.classList.add("block");
+            dCell.style.backgroundColor = piece.color;
+          }
+          grid.appendChild(dCell);
+        }
+      }
+      dragLayerEl.appendChild(grid);
+      dragLayerEl.style.display = "block";
+    }
+
+    function updateDragVisual(clientX, clientY) {
+      if (!dragState) return;
+      dragLayerEl.style.left = `${clientX}px`;
+      dragLayerEl.style.top = `${clientY - 24}px`;
+
+      const { startRow, startCol } = getBoardDropPosition(clientX, clientY, dragState.piece.matrix);
+      if (canPlace(dragState.piece.matrix, startRow, startCol)) {
+        const ghost = [];
+        const rows = dragState.piece.matrix.length;
+        const cols = dragState.piece.matrix[0].length;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (dragState.piece.matrix[r][c]) {
+              ghost.push([startRow + r, startCol + c]);
+            }
+          }
+        }
+        renderBoard(ghost);
+      } else {
+        renderBoard([]);
+      }
+    }
+
+    dockEl.addEventListener("pointerdown", (e) => {
+      const slotEl = e.target.closest(".dock-slot");
+      if (!slotEl) return;
+      const slotIndex = Number(slotEl.dataset.slot);
+      const piece = dockPieces[slotIndex];
+      if (!piece) return;
+
+      slotEl.classList.add("hidden-piece");
+      dragState = { slotIndex, piece };
+      buildDragElement(piece);
+      updateDragVisual(e.clientX, e.clientY);
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!dragState) return;
+      updateDragVisual(e.clientX, e.clientY);
+    });
+
+    window.addEventListener("pointerup", (e) => {
+      if (!dragState) return;
+      const { slotIndex, piece } = dragState;
+      const { startRow, startCol } = getBoardDropPosition(e.clientX, e.clientY, piece.matrix);
+
+      if (canPlace(piece.matrix, startRow, startCol)) {
+        placePiece(piece, startRow, startCol);
+        dockPieces[slotIndex] = null;
+        refillDockIfEmpty();
+        renderDock();
+
+        if (!hasAnyValidMove()) {
+          finalScoreEl.textContent = score;
+          overlayEl.classList.add("show");
+        }
+      } else {
+        renderDock();
+      }
+
+      dragState = null;
+      dragLayerEl.style.display = "none";
+      renderBoard([]);
+    });
+
+    document.getElementById("restart-btn").addEventListener("click", initGame);
+    document.getElementById("play-again-btn").addEventListener("click", initGame);
+
+    initGame();
+  </script>
+</body>
+</html>
